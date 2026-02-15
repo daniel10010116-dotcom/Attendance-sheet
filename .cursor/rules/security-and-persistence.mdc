@@ -1,0 +1,81 @@
+---
+description: 前端無密鑰、真實資料庫持久化、路由/API 權限、審計日誌、速率限制、密碼雜湊、資料庫選型、密鑰管理與 .gitignore
+alwaysApply: true
+---
+
+# Security & Persistence Standards
+
+## 1. No Secrets on Client (前端絕對不留密鑰)
+
+前端代碼對用戶是透明的。任何私密 Key (OpenAI Key、AWS Secret) 都必須放在後端。
+
+- **檢查**：前端代碼不得 Hard-code 任何 API Key 或敏感邏輯。
+- **做法**：所有第三方 API 請求必須透過 Next.js API Route、或後端 Proxy 轉發。
+
+---
+
+## 2. Real Database for Persistence (拒絕「暫存當永久」)
+
+- **禁止**：僅用瀏覽器 `localStorage` 或記憶體變數儲存核心業務資料；一重新整理或換瀏覽器資料就不見。
+- **允許**：localStorage 僅用於「不重要」的用戶偏好（如深色模式）。
+- **做法**：核心業務資料（訂單、用戶資訊等）必須存入 PostgreSQL/MySQL 等資料庫。
+
+---
+
+## 3. Frontend Route Guards (頁面路由權限控管)
+
+只在 UI 隱藏按鈕不算安全，用戶可直接輸入 `/admin` 進入。
+
+- **做法**：實作前端 Middleware 或 Route Guard。進入 `/admin`、`/dashboard` 等頁面前，必須驗證用戶 Session 存在且具備正確權限，否則強制重導向回登入頁。
+
+---
+
+## 4. Backend RBAC (API 後端權限驗證)
+
+零信任原則：後端不應相信任何前端傳來的請求。
+
+- **做法**：所有會修改資料的 API (POST/PUT/DELETE) 都必須在後端做權限驗證，例如確認 `request.user.role === 'admin'` 才執行操作。駭客用 Postman 直接打 API 時也必須被擋下。
+
+---
+
+## 5. Audit Logging (審計日誌)
+
+系統出錯或資料被竄改時需有紀錄可追查。
+
+- **做法**：為關鍵操作（刪除、修改權限、金額變動）建立 AuditLog 表。記錄欄位應包含：操作者 ID、操作時間、操作類型、原本數值、新數值。
+
+---
+
+## 6. API Rate Limiting (速率限制)
+
+登入或高成本 API 若無限流，易遭暴力破解或刷爆額度。
+
+- **做法**：在登入 (Login) 與高成本 API 接口加入 Rate Limiting。例如：同一 IP 在 1 分鐘內只能嘗試登入 5 次。可採用 Nginx 設定或應用層套件 (如 express-rate-limit)。
+
+---
+
+## 7. Password Hashing (密碼加密儲存)
+
+- **禁止**：資料庫以明文儲存密碼。MD5 已不安全。
+- **做法**：用戶密碼存入資料庫前，必須使用 **bcrypt** 或 **Argon2** 進行 Hash（加鹽），嚴禁明文儲存。
+
+---
+
+## 8. Redis is for Cache (選對資料庫)
+
+- **禁止**：把 Redis 當成主資料庫；Redis 是記憶體式，重開機資料可能消失。
+- **做法**：永久性資料使用關聯式資料庫 (SQL) 或 NoSQL (MongoDB)；Redis 僅用於 Session 管理或快取加速。
+
+---
+
+## 9. Secrets Management (敏感檔案不進 Git)
+
+- **禁止**：將 `.env`（內含私鑰、密碼）或任何 API Key/Secret 寫死在代碼庫並上傳至 Git。
+- **做法**：專案初始化時確保 `.env` 已加入 `.gitignore`，所有機密僅透過環境變數注入。
+
+---
+
+## 10. .gitignore Configuration (版本控制潔癖)
+
+- **禁止**：將 `node_modules`、`dist`、`.env`、log 檔等推上 Git，導致專案肥大、clone/pull 變慢。
+- **做法**：為專案維護標準 `.gitignore`，務必排除：`node_modules/`、`dist/`、`.env`、`.env.local`、`.DS_Store`、`*.log` 等。

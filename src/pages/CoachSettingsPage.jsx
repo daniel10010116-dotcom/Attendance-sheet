@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
@@ -6,28 +6,41 @@ import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 
 export default function CoachSettingsPage() {
   const { coachId } = useParams()
   const navigate = useNavigate()
-  const coach = mockStore.getCoach(coachId)
-  const [account, setAccount] = useState(coach?.account ?? '')
+  const [coach, setCoach] = useState(null)
+  const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  useEffect(() => {
+    if (!coachId) return
+    dataStore.getCoach(coachId).then((c) => {
+      setCoach(c)
+      setAccount(c?.account ?? '')
+    })
+  }, [coachId])
+
+  if (coach === null) return null
   if (!coach) return <Navigate to="/admin" replace />
 
-  const handleSave = () => {
-    mockStore.updateCoachAccount(coachId, account.trim(), password.trim() || null)
-    setPassword('')
+  const handleSave = async () => {
+    try {
+      await dataStore.updateCoachAccount(coachId, account.trim(), password.trim() || null)
+      setPassword('')
+    } catch (_) {}
   }
 
-  const handleDelete = () => {
-    mockStore.deleteCoach(coachId)
-    setConfirmDelete(false)
-    navigate('/admin', { replace: true })
+  const handleDelete = async () => {
+    try {
+      await dataStore.deleteCoach(coachId)
+      setConfirmDelete(false)
+      navigate('/admin', { replace: true })
+    } catch (_) {}
   }
 
   return (

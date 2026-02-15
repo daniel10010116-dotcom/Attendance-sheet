@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
@@ -8,15 +8,17 @@ import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import ToggleButton from '@mui/material/ToggleButton'
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
-import Modal from '@mui/material/Modal'
 import TopBar from '../components/TopBar'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 import ResetPasswordModal from '../components/ResetPasswordModal'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 
 export default function AdminHomePage() {
   const navigate = useNavigate()
   const [tick, setTick] = useState(0)
+  const [students, setStudents] = useState([])
+  const [coaches, setCoaches] = useState([])
+  const [coachEarned, setCoachEarned] = useState({})
   const [addRole, setAddRole] = useState('coach')
   const [coachForm, setCoachForm] = useState({ name: '', account: '', password: '' })
   const [studentForm, setStudentForm] = useState({ name: '', account: '', password: '', contact: '' })
@@ -25,70 +27,99 @@ export default function AdminHomePage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [message, setMessage] = useState('')
 
-  const students = useMemo(() => mockStore.getStudents(), [tick])
-  const coaches = useMemo(() => mockStore.getCoaches(), [tick])
+  useEffect(() => {
+    dataStore.getStudents().then(setStudents)
+    dataStore.getCoaches().then(async (list) => {
+      setCoaches(list)
+      const map = {}
+      for (const c of list || []) {
+        map[c.id] = await dataStore.getCoachEarned(c.id)
+      }
+      setCoachEarned(map)
+    })
+  }, [tick])
 
-  const handleCreateCoach = (e) => {
+  const handleCreateCoach = async (e) => {
     e.preventDefault()
     if (!coachForm.name.trim() || !coachForm.account.trim() || !coachForm.password) {
       setMessage('請填寫名稱、帳號、密碼')
       return
     }
-    const id = mockStore.createCoach(coachForm.name.trim(), coachForm.account.trim(), coachForm.password)
-    if (!id) {
-      setMessage('此帳號已被使用，請換一個')
-      return
+    try {
+      const id = await dataStore.createCoach(coachForm.name.trim(), coachForm.account.trim(), coachForm.password)
+      if (!id) {
+        setMessage('此帳號已被使用，請換一個')
+        return
+      }
+      setCoachForm({ name: '', account: '', password: '' })
+      setMessage('教練帳號已建立')
+      setTick((t) => t + 1)
+    } catch {
+      setMessage('此帳號已被使用或發生錯誤')
     }
-    setCoachForm({ name: '', account: '', password: '' })
-    setMessage('教練帳號已建立')
-    setTick((t) => t + 1)
   }
 
-  const handleCreateStudent = (e) => {
+  const handleCreateStudent = async (e) => {
     e.preventDefault()
     if (!studentForm.name.trim() || !studentForm.account.trim() || !studentForm.password) {
       setMessage('請填寫名稱、帳號、密碼')
       return
     }
-    const id = mockStore.createStudent(studentForm.name.trim(), studentForm.account.trim(), studentForm.password, studentForm.contact.trim())
-    if (!id) {
-      setMessage('此帳號已被使用，請換一個')
-      return
+    try {
+      const id = await dataStore.createStudent(studentForm.name.trim(), studentForm.account.trim(), studentForm.password, studentForm.contact.trim())
+      if (!id) {
+        setMessage('此帳號已被使用，請換一個')
+        return
+      }
+      setStudentForm({ name: '', account: '', password: '', contact: '' })
+      setMessage('學生帳號已建立')
+      setTick((t) => t + 1)
+    } catch {
+      setMessage('此帳號已被使用或發生錯誤')
     }
-    setStudentForm({ name: '', account: '', password: '', contact: '' })
-    setMessage('學生帳號已建立')
-    setTick((t) => t + 1)
   }
 
-  const handleAssign = (e) => {
+  const handleAssign = async (e) => {
     e.preventDefault()
     if (!assignForm.studentId || !assignForm.coachId || assignForm.totalLessons <= 0) {
       setMessage('請選擇學生、教練並填寫堂數')
       return
     }
-    mockStore.assignStudentToCoach(
-      assignForm.studentId,
-      assignForm.coachId,
-      assignForm.courseName,
-      Number(assignForm.totalLessons),
-      Number(assignForm.salaryWhenDone) || 0
-    )
-    setAssignForm({ ...assignForm, courseName: '課程', totalLessons: 10, salaryWhenDone: 0 })
-    setMessage('已分配課程')
-    setTick((t) => t + 1)
+    try {
+      await dataStore.assignStudentToCoach(
+        assignForm.studentId,
+        assignForm.coachId,
+        assignForm.courseName,
+        Number(assignForm.totalLessons),
+        Number(assignForm.salaryWhenDone) || 0
+      )
+      setAssignForm({ ...assignForm, courseName: '課程', totalLessons: 10, salaryWhenDone: 0 })
+      setMessage('已分配課程')
+      setTick((t) => t + 1)
+    } catch {
+      setMessage('分配失敗')
+    }
   }
 
-  const handleResetPassword = (studentId, newPassword) => {
-    mockStore.resetStudentPassword(studentId, newPassword)
-    setResetTarget(null)
-    setTick((t) => t + 1)
+  const handleResetPassword = async (studentId, newPassword) => {
+    try {
+      await dataStore.resetStudentPassword(studentId, newPassword)
+      setResetTarget(null)
+      setTick((t) => t + 1)
+    } catch {
+      setMessage('重設密碼失敗')
+    }
   }
 
-  const handleDeleteStudent = () => {
+  const handleDeleteStudent = async () => {
     if (!deleteTarget) return
-    mockStore.deleteStudent(deleteTarget.id)
-    setDeleteTarget(null)
-    setTick((t) => t + 1)
+    try {
+      await dataStore.deleteStudent(deleteTarget.id)
+      setDeleteTarget(null)
+      setTick((t) => t + 1)
+    } catch {
+      setMessage('刪除失敗')
+    }
   }
 
   return (
@@ -278,7 +309,7 @@ export default function AdminHomePage() {
             {coaches.map((c) => (
               <Box key={c.id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.5, borderBottom: '1px solid #F1F5F9', flexWrap: 'wrap', gap: 1 }}>
                 <Typography sx={{ fontSize: 14, fontWeight: 500 }}>{c.name}</Typography>
-                <Typography sx={{ fontSize: 14, color: '#0D9488' }}>累計 NT$ {mockStore.getCoachEarned(c.id)}</Typography>
+                <Typography sx={{ fontSize: 14, color: '#0D9488' }}>累計 NT$ {coachEarned[c.id] ?? 0}</Typography>
                 <Box>
                   <Button variant="contained" size="small" sx={{ mr: 1, minWidth: 100, height: 32 }} onClick={() => navigate(`/admin/coach/${c.id}/pay`)}>確認發薪</Button>
                   <Button variant="outlined" size="small" sx={{ minWidth: 90, height: 32 }} onClick={() => navigate(`/admin/coach/${c.id}/settings`)}>帳號設定</Button>

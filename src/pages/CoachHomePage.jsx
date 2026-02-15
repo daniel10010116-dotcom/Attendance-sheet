@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -13,36 +13,46 @@ import TextField from '@mui/material/TextField'
 import Modal from '@mui/material/Modal'
 import TopBar from '../components/TopBar'
 import { useAuth } from '../contexts/AuthContext'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 
 export default function CoachHomePage() {
   const { user } = useAuth()
   const [tick, setTick] = useState(0)
+  const [pendingList, setPendingList] = useState([])
+  const [enrollments, setEnrollments] = useState([])
+  const [earned, setEarned] = useState(0)
+  const [salaryDetails, setSalaryDetails] = useState([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [queryOpen, setQueryOpen] = useState(false)
   const [records, setRecords] = useState([])
 
-  const pendingList = useMemo(() => mockStore.getPendingByCoach(user?.id) ?? [], [user?.id, tick])
-  const enrollments = useMemo(() => mockStore.getEnrollmentsByCoach(user?.id) ?? [], [user?.id, tick])
-  const earned = useMemo(() => mockStore.getCoachEarned(user?.id) ?? 0, [user?.id, tick])
-  const salaryDetails = useMemo(() => mockStore.getCompletedSalaryDetails(user?.id) ?? [], [user?.id, tick])
+  useEffect(() => {
+    if (!user?.id) return
+    dataStore.getPendingByCoach(user.id).then(setPendingList)
+    dataStore.getEnrollmentsByCoach(user.id).then(setEnrollments)
+    dataStore.getCoachEarned(user.id).then(setEarned)
+    dataStore.getCompletedSalaryDetails(user.id).then(setSalaryDetails)
+  }, [user?.id, tick])
 
-  // 定期重新讀取待確認點名，學生點名後教練端會自動顯示
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 2000)
     return () => clearInterval(interval)
   }, [])
 
-  const handleConfirm = (pendingId) => {
-    mockStore.confirmAttendance(pendingId)
-    setTick((t) => t + 1)
+  const handleConfirm = async (pendingId) => {
+    try {
+      await dataStore.confirmAttendance(pendingId)
+      setTick((t) => t + 1)
+    } catch (_) {}
   }
 
-  const handleQuery = () => {
-    const list = mockStore.getAttendanceRecords(user?.id, startDate || undefined, endDate || undefined)
-    setRecords(list)
-    setQueryOpen(true)
+  const handleQuery = async () => {
+    try {
+      const list = await dataStore.getAttendanceRecords(user?.id, startDate || undefined, endDate || undefined)
+      setRecords(list)
+      setQueryOpen(true)
+    } catch (_) {}
   }
 
   // 為每筆扣堂紀錄計算「第幾節課」（同課程內依確認時間排序）
@@ -63,16 +73,13 @@ export default function CoachHomePage() {
     return records.map((r) => ({ ...r, lessonNumber: idToLesson[r.id] ?? 1 }))
   }, [records])
 
-  const rows = enrollments.map((enr) => {
-    const student = mockStore.getStudent(enr.studentId)
-    return {
-      studentName: student?.name ?? '-',
-      contact: student?.contact || '－',
-      courseName: enr.courseName,
-      remaining: enr.remainingLessons,
-      salaryWhenDone: enr.salaryWhenDone,
-    }
-  })
+  const rows = enrollments.map((enr) => ({
+    studentName: enr.studentName ?? '-',
+    contact: enr.contact ?? '－',
+    courseName: enr.courseName,
+    remaining: enr.remainingLessons,
+    salaryWhenDone: enr.salaryWhenDone,
+  }))
 
   return (
     <>

@@ -8,7 +8,7 @@ import AdminHomePage from './pages/AdminHomePage'
 import CoachPayPage from './pages/CoachPayPage'
 import CoachSettingsPage from './pages/CoachSettingsPage'
 import { useAuth } from './contexts/AuthContext'
-import { mockStore } from './store/mockStore'
+import { dataStore } from './store/dataStore'
 
 function PrivateRoute({ children, allowedRoles }) {
   const { user, logout } = useAuth()
@@ -16,14 +16,23 @@ function PrivateRoute({ children, allowedRoles }) {
 
   useEffect(() => {
     if (!user) return
-    if (user.role === 'student' && !mockStore.getStudent(user.id)) {
-      logout()
-      navigate('/', { replace: true })
+    let cancelled = false
+    if (user.role === 'student') {
+      dataStore.getStudent(user.id).then((s) => {
+        if (!cancelled && !s) {
+          logout()
+          navigate('/', { replace: true })
+        }
+      })
+    } else if (user.role === 'coach') {
+      dataStore.getCoach(user.id).then((c) => {
+        if (!cancelled && !c) {
+          logout()
+          navigate('/', { replace: true })
+        }
+      })
     }
-    if (user.role === 'coach' && !mockStore.getCoach(user.id)) {
-      logout()
-      navigate('/', { replace: true })
-    }
+    return () => { cancelled = true }
   }, [user, logout, navigate])
 
   if (!user) return <Navigate to="/" replace />

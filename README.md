@@ -31,6 +31,38 @@ npm run dev
 | 教練   | coach1   | 123   |
 | 學生   | student1 | 123   |
 
+## 後端與資料庫（§2 持久化、§7 密碼雜湊）
+
+專案提供 **Node.js + Express + SQLite** 後端，密碼以 **bcrypt** 雜湊儲存，核心資料存於資料庫，符合 `.cursor/rules/security-and-persistence.mdc`。
+
+### 啟動後端（本機）
+
+```bash
+cd server
+npm install
+node scripts/init-db.js   # 建立 database.sqlite 與預設 admin（帳號 admin / 密碼 admin）、種子教練/學生
+npm run dev               # 或 npm start，預設 http://localhost:3001
+```
+
+### 前端接後端
+
+在專案根目錄建立 `.env`（可複製 `.env.example`），設定：
+
+```
+VITE_API_URL=http://localhost:3001
+```
+
+然後 `npm run dev` 啟動前端，登入與所有資料會走 API，多人共用同一份資料。
+
+未設定 `VITE_API_URL` 時，前端仍使用 mock 資料（localStorage），僅本機單機有效。
+
+### 後端環境變數（選填）
+
+- `PORT`：預設 3001  
+- `JWT_SECRET`：正式環境請改為隨機長字串  
+- `SQLITE_PATH`：未設則使用 `server/database.sqlite`  
+- `CORS_ORIGIN`：未設則接受所有 origin  
+
 ## 建置
 
 ```bash

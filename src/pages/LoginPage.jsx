@@ -21,14 +21,14 @@ export default function LoginPage() {
 
   if (user) return <Navigate to={getRolePath(user.role)} replace />
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    const result = login(account.trim(), password)
-    if (result.ok) {
+    const result = await login(account.trim(), password)
+    if (result?.ok) {
       navigate(getRolePath(result.role), { replace: true })
     } else {
-      setError('帳號或密碼錯誤')
+      setError(result?.error || '帳號或密碼錯誤')
     }
   }
 

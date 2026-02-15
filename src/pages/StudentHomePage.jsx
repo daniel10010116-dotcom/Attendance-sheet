@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -6,16 +6,39 @@ import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import TopBar from '../components/TopBar'
 import { useAuth } from '../contexts/AuthContext'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 
 export default function StudentHomePage() {
   const { user } = useAuth()
   const [tick, setTick] = useState(0)
-  const enrollments = useMemo(() => mockStore.getEnrollmentsByStudent(user?.id) ?? [], [user?.id, tick])
+  const [enrollments, setEnrollments] = useState([])
+  const [pendingMap, setPendingMap] = useState({})
 
-  const handleRequestAttendance = (enrollmentId) => {
-    mockStore.requestAttendance(enrollmentId)
-    setTick((t) => t + 1)
+  useEffect(() => {
+    if (!user?.id) return
+    dataStore.getEnrollmentsByStudent(user.id).then(setEnrollments)
+  }, [user?.id, tick])
+
+  useEffect(() => {
+    if (enrollments.length === 0) {
+      setPendingMap({})
+      return
+    }
+    let cancelled = false
+    const map = {}
+    enrollments.forEach((enr) => {
+      dataStore.getPendingByEnrollment(enr.id).then((p) => {
+        if (!cancelled) setPendingMap((m) => ({ ...m, [enr.id]: p }))
+      })
+    })
+    return () => { cancelled = true }
+  }, [enrollments])
+
+  const handleRequestAttendance = async (enrollmentId) => {
+    try {
+      await dataStore.requestAttendance(enrollmentId)
+      setTick((t) => t + 1)
+    } catch (_) {}
   }
 
   return (
@@ -33,8 +56,8 @@ export default function StudentHomePage() {
               </Typography>
             ) : (
               enrollments.map((enr, i) => {
-                const coach = mockStore.getCoach(enr.coachId)
-                const pending = mockStore.getPendingByEnrollment(enr.id)
+                const coachName = enr.coachName ?? '教練'
+                const pending = pendingMap[enr.id]
                 const canRequest = enr.remainingLessons > 0 && !pending
                 return (
                   <Box
@@ -51,7 +74,7 @@ export default function StudentHomePage() {
                     }}
                   >
                     <Box>
-                      <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{coach?.name ?? '教練'}</Typography>
+                      <Typography sx={{ fontWeight: 600, fontSize: 16 }}>{coachName}</Typography>
                       <Typography variant="body2" color="text.secondary">
                         {enr.courseName} · 剩餘{' '}
                         <Typography component="span" sx={{ color: '#0D9488', fontWeight: 600 }}>

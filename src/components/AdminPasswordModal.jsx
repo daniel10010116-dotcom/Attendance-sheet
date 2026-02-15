@@ -4,7 +4,7 @@ import Modal from '@mui/material/Modal'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function AdminPasswordModal({ open, onClose }) {
@@ -25,7 +25,7 @@ export default function AdminPasswordModal({ open, onClose }) {
     }
   }, [open, user?.account])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('')
     setSuccess('')
     if (!account.trim()) {
@@ -36,24 +36,28 @@ export default function AdminPasswordModal({ open, onClose }) {
       setError('兩次密碼輸入不一致')
       return
     }
-    let ok = false
-    if (user?.role === 'admin') {
-      ok = mockStore.updateAdminAccount(account.trim(), password || null)
-    } else if (user?.role === 'coach') {
-      ok = mockStore.updateCoachAccount(user.id, account.trim(), password || null)
-    } else if (user?.role === 'student') {
-      ok = mockStore.updateStudentAccount(user.id, account.trim(), password || null)
-    }
-    if (ok) {
-      updateCurrentUser({ account: account.trim() })
-      setSuccess('已更新，下次登入請使用新帳密')
-      setPassword('')
-      setConfirmPassword('')
-      setTimeout(() => {
-        onClose()
-        setSuccess('')
-      }, 1500)
-    } else {
+    try {
+      let ok = false
+      if (user?.role === 'admin') {
+        ok = await dataStore.updateAdminAccount(account.trim(), password || null)
+      } else if (user?.role === 'coach') {
+        ok = await dataStore.updateCoachAccount(user.id, account.trim(), password || null)
+      } else if (user?.role === 'student') {
+        ok = await dataStore.updateStudentAccount(user.id, account.trim(), password || null)
+      }
+      if (ok) {
+        updateCurrentUser({ account: account.trim() })
+        setSuccess('已更新，下次登入請使用新帳密')
+        setPassword('')
+        setConfirmPassword('')
+        setTimeout(() => {
+          onClose()
+          setSuccess('')
+        }, 1500)
+      } else {
+        setError(user?.role === 'admin' ? '更新失敗' : '此帳號已被使用或更新失敗')
+      }
+    } catch {
       setError(user?.role === 'admin' ? '更新失敗' : '此帳號已被使用或更新失敗')
     }
   }

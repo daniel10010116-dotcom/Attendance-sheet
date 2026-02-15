@@ -6,3 +6,6 @@ dist/
 .DS_Store
 *.log
 *.local
+server/node_modules/
+server/*.sqlite
+server/.env

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
+import { api } from '../api/client'
 
 const AuthContext = createContext(null)
 
@@ -12,8 +13,20 @@ export function AuthProvider({ children }) {
     }
   })
 
-  const login = useCallback((account, password) => {
-    const u = window.__mockAuth(account, password)
+  const login = useCallback(async (account, password) => {
+    if (api.useBackend) {
+      try {
+        const data = await api.login(account, password)
+        const u = data.user
+        api.setToken(data.token)
+        setUser(u)
+        sessionStorage.setItem('attendance_user', JSON.stringify(u))
+        return { ok: true, role: u.role }
+      } catch (err) {
+        return { ok: false, error: err.message }
+      }
+    }
+    const u = window.__mockAuth?.(account, password)
     if (u) {
       setUser(u)
       sessionStorage.setItem('attendance_user', JSON.stringify(u))
@@ -23,6 +36,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(() => {
+    api.setToken(null)
     setUser(null)
     sessionStorage.removeItem('attendance_user')
   }, [])

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Card from '@mui/material/Card'
@@ -9,26 +10,37 @@ import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
-import { mockStore } from '../store/mockStore'
+import { dataStore } from '../store/dataStore'
 
 export default function CoachPayPage() {
   const { coachId } = useParams()
   const navigate = useNavigate()
-  const coach = mockStore.getCoach(coachId)
-  const completed = mockStore.getCompletedEnrollmentsForCoach(coachId) ?? []
+  const [coach, setCoach] = useState(null)
+  const [completed, setCompleted] = useState([])
+
+  useEffect(() => {
+    if (!coachId) return
+    dataStore.getCoach(coachId).then(setCoach)
+    dataStore.getCompletedEnrollmentsForCoach(coachId).then(setCompleted)
+  }, [coachId])
+
   const total = completed.reduce((sum, e) => sum + (e.salaryWhenDone || 0), 0)
 
-  const handleConfirmPay = () => {
-    mockStore.confirmPayCoach(coachId)
-    navigate('/admin', { replace: true })
+  const handleConfirmPay = async () => {
+    try {
+      await dataStore.confirmPayCoach(coachId)
+      navigate('/admin', { replace: true })
+    } catch (_) {}
   }
 
+  if (coach === null) return null
   if (!coach) return <Navigate to="/admin" replace />
 
-  const rows = completed.map((enr) => {
-    const student = mockStore.getStudent(enr.studentId)
-    return { studentName: student?.name ?? '-', courseName: enr.courseName, salary: enr.salaryWhenDone }
-  })
+  const rows = completed.map((enr) => ({
+    studentName: enr.studentName ?? '-',
+    courseName: enr.courseName,
+    salary: enr.salaryWhenDone,
+  }))
 
   return (
     <>
